@@ -12,13 +12,24 @@ pianissimo 'https://www.svtplay.se/klipp/eDvaJEz/vem-ar-alexander-ernstberger'
 
 ## Install
 
-Requires Node.js 24+, Python (3.12 recommended), and FFmpeg with ffprobe. The model download is about 2.51 GB, plus Python dependencies and space for temporary audio.
+Requires Node.js 24+, Python 3.10–3.13 (3.12 recommended), and FFmpeg with ffprobe. The model download is about 2.51 GB, plus Python dependencies and space for temporary audio. Allow at least 10 GB free for a CPU installation; CUDA needs more.
 
 On macOS, install the prerequisites with Homebrew:
 
 ```bash
 brew install node@24 python@3.12 ffmpeg uv
 ```
+
+On Ubuntu/Debian, install Python and FFmpeg, and use a Node.js 24+ installation:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv ffmpeg
+node --version # Must be v24 or newer; distribution packages may be older.
+```
+
+Other Linux distributions need the equivalent Python, venv and FFmpeg packages.
+If installed, `uv` speeds up setup; otherwise setup uses Python's bundled pip.
 
 Install the CLI and download the model:
 
@@ -29,9 +40,11 @@ pianissimo doctor
 pianissimo interview.wav
 ```
 
-`setup` installs an isolated Python environment and downloads the model once. Running it again reuses the model and checks the installation. To choose a Python interpreter, use `pianissimo setup --python /path/to/python3.12`.
+`setup` finds a supported Python on PATH, installs an isolated environment and downloads the model once. Running it again reuses the environment and model. To choose a Python interpreter, use `pianissimo setup --python /path/to/python3.12`.
 
-On Linux, install Node.js, Python with venv support, and FFmpeg using your package manager. Inference has been tested on macOS with CPU and Apple Metal. Linux, CUDA, native Windows and WSL2 inference have not yet been verified.
+Linux computers without a working NVIDIA GPU get CPU-only PyTorch, avoiding the large CUDA runtime download. Intel and AMD graphics use CPU inference. macOS keeps its standard PyTorch build with Apple Metal support. NVIDIA detection uses `nvidia-smi`; for a custom CUDA build, see [GPU and cache](#gpu-and-cache).
+
+CI runs setup and real Swedish speech inference on Linux and macOS. CUDA, native Windows and WSL2 inference are not covered by these checks.
 
 ## Sources
 
@@ -141,7 +154,14 @@ npm run test:media
 
 To install a checkout globally, run `npm run build && npm install -g .`.
 
-`test:media` needs yt-dlp and FFmpeg; `setup` installs yt-dlp. The other checks do not download the model. Run `pianissimo --help` for everyday options and `pianissimo --help-all` for advanced flags.
+`test:media` needs yt-dlp and FFmpeg; `setup` installs yt-dlp. The checks above do not download the model. To verify setup, actual speech recognition, word timestamps, subtitles and offline cache reuse with the development environment:
+
+```bash
+npm run dev -- setup
+PIANISSIMO_HOME="$PWD/.pianissimo" npm run test:inference
+```
+
+Run `pianissimo --help` for everyday options and `pianissimo --help-all` for advanced flags.
 
 ## License
 

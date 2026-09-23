@@ -112,11 +112,11 @@ for (const name of ['transcribe', 'youtube']) {
   sourceOptions(program.command(name, { hidden: true })).action(transcribe);
 }
 program.command('setup').description('Install the inference environment and cache the model')
-  .option('--python <command>', 'Python 3.10–3.13 interpreter', 'python3.12')
+  .option('--python <command>', 'Python 3.10–3.13 interpreter (auto-detected by default)')
   .option('--from <directory>', 'import a model cache from an older installation')
   .option('--json', 'print setup details as JSON')
   .action(async opts => {
-    const result = await setup({ python: opts.python as string, from: opts.from as string | undefined, signal: abort.signal, reporter: new Reporter() });
+    const result = await setup({ python: opts.python as string | undefined, from: opts.from as string | undefined, signal: abort.signal, reporter: new Reporter() });
     if (opts.json || program.opts().json) await output({ type: 'setup', home: paths().root, ...result });
   });
 program.command('doctor').description('Check media tools, model cache and inference device')

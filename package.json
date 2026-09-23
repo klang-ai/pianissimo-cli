@@ -42,7 +42,8 @@
     "check": "npm run typecheck && npm test && npm run test:worker && npm run build",
     "prepack": "npm run build",
     "test:package": "node scripts/test-package.mjs",
-    "test:media": "node --import tsx scripts/test-media-integration.ts"
+    "test:media": "node --import tsx scripts/test-media-integration.ts",
+    "test:inference": "node --import tsx scripts/test-inference.ts"
   },
   "dependencies": {
     "commander": "^14.0.0",
