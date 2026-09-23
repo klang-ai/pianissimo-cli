@@ -20,16 +20,13 @@ On macOS, install the prerequisites with Homebrew:
 brew install node@24 python@3.12 ffmpeg uv
 ```
 
-Install from source:
+Install the CLI and download the model:
 
 ```bash
-git clone https://github.com/klang-ai/pianissimo-cli.git
-cd pianissimo-cli
-npm ci
-npm run build
-npm install -g .
+npm install -g @klangai/pianissimo-cli
 pianissimo setup
 pianissimo doctor
+pianissimo interview.wav
 ```
 
 `setup` installs an isolated Python environment and downloads the model once. Running it again reuses the model and checks the installation. To choose a Python interpreter, use `pianissimo setup --python /path/to/python3.12`.
@@ -130,6 +127,8 @@ For a custom Python/CUDA environment, install `worker/requirements.txt` with the
 ## Development
 
 ```bash
+git clone https://github.com/klang-ai/pianissimo-cli.git
+cd pianissimo-cli
 npm ci
 npm run dev -- setup
 npm run dev -- interview.wav --format srt
@@ -139,6 +138,8 @@ npm run test:media
 ```
 
 `npm run dev` uses the checkout's `.pianissimo/` directory. Keep the `--` separator so npm passes flags to the CLI. When piping output, use `npm run --silent dev -- interview.wav --format json`.
+
+To install a checkout globally, run `npm run build && npm install -g .`.
 
 `test:media` needs yt-dlp and FFmpeg; `setup` installs yt-dlp. The other checks do not download the model. Run `pianissimo --help` for everyday options and `pianissimo --help-all` for advanced flags.
 
