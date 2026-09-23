@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, stat, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
 import { MODEL, REVISION, ROOT, paths, pythonPath } from './config.js';
 import { run } from './process.js';
@@ -10,6 +10,51 @@ import { acquireLock } from './lock.js';
 import { checkYtdlp } from './ytdlp.js';
 
 interface Check { name: string; ok: boolean; detail: string; fix?: string }
+
+export async function findPython(requested: string | undefined, signal: AbortSignal) {
+  const candidates = requested ? [requested] : ['python3.12', 'python3', 'python3.13', 'python3.11', 'python3.10'];
+  for (const command of candidates) {
+    try {
+      const version = await run(command, ['-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'], { signal, timeoutMs: 15000 });
+      if (/^3\.(10|11|12|13)$/.test(version)) return command;
+      if (requested) throw new Error(`Python ${version} is not supported.`);
+    } catch (error) {
+      signal.throwIfAborted();
+      if (requested) throw new Error(`${message(error)} Use --python with a Python 3.10–3.13 interpreter (3.12 recommended).`);
+    }
+  }
+  throw new Error('No supported Python found. Install Python 3.10–3.13 (3.12 recommended), or use setup --python /path/to/python.');
+}
+
+export async function useCpuTorch(signal: AbortSignal, platform: NodeJS.Platform = process.platform) {
+  if (platform !== 'linux') return false;
+  try {
+    const gpus = await run('nvidia-smi', ['--query-gpu=name', '--format=csv,noheader'], { signal, timeoutMs: 5000 });
+    return !gpus.trim();
+  } catch {
+    signal.throwIfAborted();
+    return true;
+  }
+}
+
+function checkpointPath(home = paths()) {
+  return join(home.models, `models--${MODEL.replace('/', '--')}`, 'snapshots', REVISION, 'pianissimo-sv.nemo');
+}
+async function hasCheckpoint(home = paths()) {
+  return stat(checkpointPath(home)).then(info => info.isFile() && info.size > 0, () => false);
+}
+
+export function requireModelSpace(available: number) {
+  if (available < 3 * 1024 ** 3) {
+    throw new Error(`Not enough disk space: ${(available / 1024 ** 3).toFixed(1)} GiB available. The model needs at least 3 GiB free, plus additional space for Python dependencies and temporary audio. Free disk space or set PIANISSIMO_HOME to a larger drive.`);
+  }
+}
+async function checkModelSpace(home = paths()) {
+  if (await hasCheckpoint(home)) return;
+  const disk = await statfs(home.root);
+  requireModelSpace(disk.bavail * disk.bsize);
+}
+
 export async function doctor(signal: AbortSignal): Promise<Check[]> {
   const home = paths();
   const checks = await Promise.all([
@@ -30,13 +75,12 @@ export async function doctor(signal: AbortSignal): Promise<Check[]> {
   } catch (error) {
     checks.push({ name: 'Inference', ok: false, detail: message(error), fix: 'Run pianissimo setup, or set PIANISSIMO_PYTHON to your NeMo environment.' });
   }
-  const checkpoint = join(home.models, `models--${MODEL.replace('/', '--')}`, 'snapshots', REVISION, 'pianissimo-sv.nemo');
-  const cached = await stat(checkpoint).then(info => info.isFile() && info.size > 0, () => false);
-  checks.push({ name: 'Model cache', ok: cached, detail: checkpoint, ...(!cached ? { fix: 'Run pianissimo setup.' } : {}) });
+  const cached = await hasCheckpoint(home);
+  checks.push({ name: 'Model cache', ok: cached, detail: checkpointPath(home), ...(!cached ? { fix: 'Run pianissimo setup.' } : {}) });
   signal.throwIfAborted();
   return checks;
 }
-export async function setup(options: { python: string; from?: string; signal: AbortSignal; reporter: Reporter }) {
+export async function setup(options: { python?: string; from?: string; signal: AbortSignal; reporter: Reporter }) {
   const home = paths();
   await mkdir(home.root, { recursive: true, mode: 0o700 });
   const controller = new AbortController();
@@ -44,24 +88,41 @@ export async function setup(options: { python: string; from?: string; signal: Ab
   const unlock = await acquireLock(home.root, error => controller.abort(error));
   try {
     if (process.env.PIANISSIMO_PYTHON) throw new Error('PIANISSIMO_PYTHON selects your own environment. Install worker/requirements.txt there, or unset it before managed setup.');
-    const version = await run(options.python, ['-c', 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")'], { signal });
-    if (!/^3\.(10|11|12|13)$/.test(version)) throw new Error(`Python ${version} is not supported by this installer. Use --python python3.12.`);
     options.reporter.start('Setup');
-    for (const tool of ['ffmpeg', 'ffprobe']) await run(tool, ['-version'], { signal, timeoutMs: 15000 });
+    for (const tool of ['ffmpeg', 'ffprobe']) {
+      try { await run(tool, ['-version'], { signal, timeoutMs: 15000 }); }
+      catch (error) {
+        signal.throwIfAborted();
+        throw new Error(`${tool} is required. Install FFmpeg (Ubuntu/Debian: sudo apt install ffmpeg; macOS: brew install ffmpeg). ${message(error)}`);
+      }
+    }
     if (options.from && !existsSync(join(options.from, 'models'))) throw new Error('--from must point to a Pianissimo home containing a models directory.');
     const imported = await importModels(home, options.from ? [options.from] : undefined);
     if (imported) options.reporter.note(`Reused ${imported} model snapshot(s) from an earlier installation.`);
+    await checkModelSpace(home);
     let uv = false;
     try { await run('uv', ['--version'], { signal }); uv = true; } catch { /* pip fallback */ }
     const python = join(home.venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+    const interpreter = await findPython(options.python ?? (existsSync(python) ? python : undefined), signal);
     if (!existsSync(python)) {
       options.reporter.status('Creating the Python environment.');
-      if (uv) await run('uv', ['venv', '--python', options.python, home.venv], { signal });
-      else await run(options.python, ['-m', 'venv', home.venv], { signal });
+      try {
+        if (uv) await run('uv', ['venv', '--python', interpreter, home.venv], { signal });
+        else await run(interpreter, ['-m', 'venv', home.venv], { signal });
+      } catch (error) {
+        signal.throwIfAborted();
+        throw new Error(`Could not create the Python environment. Install uv, or Python venv support (Ubuntu/Debian: sudo apt install python3-venv). ${message(error)}`);
+      }
+    }
+    const install = (args: string[]) => uv
+      ? run('uv', ['pip', 'install', '--python', python, ...args], { signal })
+      : run(python, ['-m', 'pip', 'install', ...args], { signal });
+    if (await useCpuTorch(signal)) {
+      options.reporter.status('No NVIDIA GPU detected. Installing CPU-only PyTorch.');
+      await install(['torch>=2.6.0', 'torchaudio>=2.6.0', '--index-url', 'https://download.pytorch.org/whl/cpu']);
     }
     options.reporter.status('Installing PyTorch and NeMo. This can take several minutes.');
-    if (uv) await run('uv', ['pip', 'install', '--python', python, '-r', join(ROOT, 'worker/requirements.txt')], { signal });
-    else await run(python, ['-m', 'pip', 'install', '-r', join(ROOT, 'worker/requirements.txt')], { signal });
+    await install(['-r', join(ROOT, 'worker/requirements.txt')]);
     options.reporter.status('Checking the inference environment.');
     const check = await run(python, [join(ROOT, 'worker/pianissimo_worker.py'), '--check', '--cache-dir', home.models], { signal, timeoutMs: 120000 });
     options.reporter.status('Checking the model cache.');
@@ -74,6 +135,8 @@ export async function setup(options: { python: string; from?: string; signal: Ab
 }
 export async function downloadModel(signal: AbortSignal, onStatus: (text: string) => void = () => {}) {
   const home = paths();
+  // Dependencies may have consumed the space checked before installation.
+  await checkModelSpace(home);
   let result: Record<string, unknown> | undefined;
   await run(pythonPath(home), [join(ROOT, 'worker/pianissimo_worker.py'), '--download',
     '--model', MODEL, '--revision', REVISION, '--cache-dir', home.models], { signal, onLine: line => {

@@ -10,7 +10,8 @@ export const MODEL = 'KlangAI/pianissimo-sv';
 export const REVISION = '8f1f6d8f8bd7482a5ea1d2bfaf6ef5be61597138';
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_SETTINGS: Settings = {
-  model: MODEL, revision: REVISION, device: 'auto', chunkSeconds: 120, pipelineVersion: 2,
+  // Recompute transcripts that may have been produced by the broken MPS build.
+  model: MODEL, revision: REVISION, device: 'auto', chunkSeconds: 120, pipelineVersion: 3,
 };
 export function paths(home = process.env.PIANISSIMO_HOME ?? envPaths('pianissimo', { suffix: '' }).data) {
   const root = resolve(home);

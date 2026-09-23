@@ -35,3 +35,50 @@ jobs:
       - run: npm run test:media
       - run: python3 -m compileall -q worker
       - run: npm run test:package
+  inference:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PIANISSIMO_HOME: ${{ github.workspace }}/.pianissimo
+      UV_NO_CACHE: '1'
+      PIP_NO_CACHE_DIR: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+      - name: Install FFmpeg
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          else
+            brew install ffmpeg
+          fi
+      - run: npm ci
+      - run: npm run build
+      - name: Set up the real inference environment and model
+        run: node bin/pianissimo.js setup
+      - name: Transcribe Swedish speech offline and reuse its cache
+        run: npm run test:inference
+      - name: Verify setup reuses the model with Hugging Face offline
+        run: node bin/pianissimo.js setup
+        env:
+          HF_HUB_OFFLINE: '1'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: inference-logs-${{ matrix.os }}
+          path: .pianissimo/logs
