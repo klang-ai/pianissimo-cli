@@ -1,7 +1,7 @@
 # Pin NeMo and the downloader. PyTorch wheels depend on your hardware.
 # Install CUDA-enabled PyTorch first when using a custom environment.
 nemo_toolkit[asr]==3.0.0
-# 2.14 produced repeated nonsense on MPS; 2.11 passes the speech regression test.
+# Keep the macOS runtime matched to the repeated-inference regression test.
 torch==2.11.0; sys_platform == "darwin"
 torchaudio==2.11.0; sys_platform == "darwin"
 torchaudio>=2.6.0; sys_platform != "darwin"

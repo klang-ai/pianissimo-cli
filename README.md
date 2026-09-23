@@ -42,7 +42,7 @@ pianissimo interview.wav
 
 `setup` finds a supported Python on PATH, installs an isolated environment and downloads the model once. Running it again reuses the environment and model. To choose a Python interpreter, use `pianissimo setup --python /path/to/python3.12`.
 
-Linux computers without a working NVIDIA GPU get CPU-only PyTorch, avoiding the large CUDA runtime download. Intel and AMD graphics use CPU inference. macOS uses a tested PyTorch 2.11 build with Apple Metal support; 2.14 returned incorrect text on MPS in our speech test. NVIDIA detection uses `nvidia-smi`; for a custom CUDA build, see [Storage](#storage).
+Linux computers without a working NVIDIA GPU get CPU-only PyTorch, avoiding the large CUDA runtime download. Intel and AMD graphics use CPU inference. macOS uses PyTorch 2.11 with Apple Metal support. The worker waits for input transfers to finish on MPS to prevent corrupted audio and timestamps. NVIDIA detection uses `nvidia-smi`; for a custom CUDA build, see [Storage](#storage).
 
 CI runs setup and real Swedish speech inference on Linux and macOS, including both automatic device selection and explicit CPU inference on Mac. CUDA, native Windows and WSL2 inference are not covered by these checks.
 

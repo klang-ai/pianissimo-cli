@@ -63,6 +63,13 @@ def main():
     cuda_available = torch.cuda.is_available()
     mps_available = torch.backends.mps.is_available()
     device = select_device(args.device, cuda_available=cuda_available, mps_available=mps_available)
+    if device == "mps":
+        # NeMo replaces the CPU batch immediately after its non-blocking copy.
+        # MPS can then read released storage, corrupting audio and sequence lengths.
+        # Keep CPU tensors alive until transfer completes; CUDA keeps its fast path.
+        from functools import partial
+        from nemo.collections.asr.parts.mixins import transcription
+        transcription.move_data_to_device = partial(transcription.move_data_to_device, non_blocking=False)
     device_name = torch.cuda.get_device_name(0) if device == "cuda" else (
         torch.backends.mps.get_name() if device == "mps" and hasattr(torch.backends.mps, "get_name") else
         "Apple GPU" if device == "mps" else "CPU"

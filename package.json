@@ -1,6 +1,6 @@
 {
   "name": "@klangai/pianissimo-cli",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Swedish speech to text for files, podcasts and media URLs, powered by Klang Pianissimo.",
   "license": "MIT",
   "author": "Klang",
