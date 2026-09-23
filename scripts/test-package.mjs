@@ -10,7 +10,8 @@ const run = (command, args, extra = {}) => execFileSync(command, args, { encodin
 try {
   const [packed] = JSON.parse(run(npm, ['pack', '--json', '--pack-destination', root]));
   const files = packed.files.map(file => file.path);
-  for (const required of ['bin/pianissimo.js', 'dist/cli.js', 'dist/feeds.js', 'worker/pianissimo_worker.py', 'worker/model_cache.py', 'worker/runtime.py', 'worker/requirements.txt']) assert.ok(files.includes(required), `Missing ${required}`);
+  for (const required of ['LICENSE', 'NOTICE', 'README.md', 'bin/pianissimo.js', 'dist/cli.js', 'dist/feeds.js', 'worker/pianissimo_worker.py', 'worker/model_cache.py', 'worker/runtime.py', 'worker/requirements.txt']) assert.ok(files.includes(required), `Missing ${required}`);
+  assert.ok(!files.some(file => /(?:REVIEW|VALIDATION)\.md$/.test(file)), 'Local review notes must not be published');
   assert.ok(files.every(file => !/\.pianissimo|node_modules|__pycache__|dist\/(?:store|youtube)\.|\.sqlite/.test(file)), 'Unexpected state or obsolete code in the package');
   const prefix = join(root, 'installed');
   run(npm, ['install', '--prefix', prefix, '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', join(root, packed.filename)]);

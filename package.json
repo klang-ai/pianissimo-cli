@@ -2,6 +2,21 @@
   "name": "@klangai/pianissimo-cli",
   "version": "0.2.1",
   "description": "Swedish speech to text for files, podcasts and media URLs, powered by Klang Pianissimo.",
+  "license": "MIT",
+  "author": "Klang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/klang-ai/pianissimo-cli.git"
+  },
+  "homepage": "https://github.com/klang-ai/pianissimo-cli#readme",
+  "bugs": {
+    "url": "https://github.com/klang-ai/pianissimo-cli/issues"
+  },
+  "keywords": ["cli", "speech-to-text", "transcription", "swedish", "pianissimo", "subtitles"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "bin": {
     "pianissimo": "bin/pianissimo.js"
@@ -12,9 +27,8 @@
     "worker/*.py",
     "worker/requirements.txt",
     "README.md",
-    "VALIDATION.md",
-    "NOTICE",
-    "REVIEW.md"
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=24.0.0"

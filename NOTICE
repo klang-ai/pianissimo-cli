@@ -9,5 +9,5 @@ Default revision: 8f1f6d8f8bd7482a5ea1d2bfaf6ef5be61597138
 
 The CLI downloads the original model checkpoint without modifying its weights.
 The checkpoint is not included in the npm package.
-The model license does not determine the license of this CLI's source code.
+The CLI source code is licensed under the MIT License; see LICENSE.
 NeMo, PyTorch, yt-dlp, FFmpeg and npm dependencies retain their own licenses.
