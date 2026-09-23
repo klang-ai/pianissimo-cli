@@ -1,0 +1,13 @@
+Pianissimo CLI uses the Klang Pianissimo Swedish speech recognition model.
+
+Model: KlangAI/pianissimo-sv
+Author: Klang
+Source: https://huggingface.co/KlangAI/pianissimo-sv
+Model license: Creative Commons Attribution 4.0 International
+License: https://creativecommons.org/licenses/by/4.0/
+Default revision: 8f1f6d8f8bd7482a5ea1d2bfaf6ef5be61597138
+
+The CLI downloads the original model checkpoint without modifying its weights.
+The checkpoint is not included in the npm package.
+The model license does not determine the license of this CLI's source code.
+NeMo, PyTorch, yt-dlp, FFmpeg and npm dependencies retain their own licenses.

@@ -1,0 +1,5 @@
+# Pin NeMo and the downloader. PyTorch wheels depend on your hardware.
+# Install CUDA-enabled PyTorch first when using a custom environment.
+nemo_toolkit[asr]==3.0.0
+torchaudio>=2.6.0
+yt-dlp[default]==2026.8.19

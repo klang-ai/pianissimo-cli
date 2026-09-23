@@ -1,0 +1,37 @@
+name: Check
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install media test dependencies
+        shell: bash
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            if [[ "$RUNNER_OS" == "Linux" ]]; then
+              sudo apt-get update
+              sudo apt-get install -y ffmpeg
+            else
+              brew install ffmpeg
+            fi
+          fi
+          python3 -m venv "$RUNNER_TEMP/pianissimo-media"
+          "$RUNNER_TEMP/pianissimo-media/bin/python" -m pip install 'yt-dlp[default]==2026.8.19'
+          echo "PIANISSIMO_YTDLP=$RUNNER_TEMP/pianissimo-media/bin/yt-dlp" >> "$GITHUB_ENV"
+      - run: npm run check
+      - run: npm run test:media
+      - run: python3 -m compileall -q worker
+      - run: npm run test:package
