@@ -49,6 +49,11 @@ export function requireModelSpace(available: number) {
     throw new Error(`Not enough disk space: ${(available / 1024 ** 3).toFixed(1)} GiB available. The model needs at least 3 GiB free, plus additional space for Python dependencies and temporary audio. Free disk space or set PIANISSIMO_HOME to a larger drive.`);
   }
 }
+async function checkModelSpace(home = paths()) {
+  if (await hasCheckpoint(home)) return;
+  const disk = await statfs(home.root);
+  requireModelSpace(disk.bavail * disk.bsize);
+}
 
 export async function doctor(signal: AbortSignal): Promise<Check[]> {
   const home = paths();
@@ -94,10 +99,7 @@ export async function setup(options: { python?: string; from?: string; signal: A
     if (options.from && !existsSync(join(options.from, 'models'))) throw new Error('--from must point to a Pianissimo home containing a models directory.');
     const imported = await importModels(home, options.from ? [options.from] : undefined);
     if (imported) options.reporter.note(`Reused ${imported} model snapshot(s) from an earlier installation.`);
-    if (!await hasCheckpoint(home)) {
-      const disk = await statfs(home.root);
-      requireModelSpace(disk.bavail * disk.bsize);
-    }
+    await checkModelSpace(home);
     let uv = false;
     try { await run('uv', ['--version'], { signal }); uv = true; } catch { /* pip fallback */ }
     const python = join(home.venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
@@ -133,6 +135,8 @@ export async function setup(options: { python?: string; from?: string; signal: A
 }
 export async function downloadModel(signal: AbortSignal, onStatus: (text: string) => void = () => {}) {
   const home = paths();
+  // Dependencies may have consumed the space checked before installation.
+  await checkModelSpace(home);
   let result: Record<string, unknown> | undefined;
   await run(pythonPath(home), [join(ROOT, 'worker/pianissimo_worker.py'), '--download',
     '--model', MODEL, '--revision', REVISION, '--cache-dir', home.models], { signal, onLine: line => {

@@ -73,7 +73,7 @@ jobs:
         run: node bin/pianissimo.js setup
       - name: Transcribe Swedish speech offline and reuse its cache
         run: npm run test:inference
-      - name: Verify setup can be repeated offline
+      - name: Verify setup reuses the model with Hugging Face offline
         run: node bin/pianissimo.js setup
         env:
           HF_HUB_OFFLINE: '1'
