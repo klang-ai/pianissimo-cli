@@ -9,13 +9,14 @@ import { Reporter } from '../src/reporter.js';
 import { runSources } from '../src/pipeline.js';
 import { cacheKey } from '../src/util.js';
 import type { Engine, RunOptions, Source } from '../src/types.js';
+import type { Completed } from '../src/pipeline.js';
 
 async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
   const root = await mkdtemp(join(tmpdir(), 'pianissimo-run-'));
   const home = { ...paths(root), work: join(root, 'work') };
   t.after(() => rm(root, { recursive: true, force: true }));
   const source: Source = { id: 'youtube:testvideo01', kind: 'url', title: 'Svenska röster', location: 'https://www.youtube.com/watch?v=testvideo01', fingerprint: 'source1' };
-  const options: RunOptions = { output: join(root, 'out'), formats: ['txt', 'srt', 'vtt'], settings: { ...DEFAULT_SETTINGS, chunkSeconds: 15 }, downloads: 2, keepAudio: false, force: false };
+  const options = { output: join(root, 'out'), formats: ['txt', 'srt', 'vtt'], settings: { ...DEFAULT_SETTINGS, chunkSeconds: 15 }, downloads: 2, keepAudio: false, force: false } satisfies RunOptions;
   const prepare = async (_source: Source, directory: string) => {
     await mkdir(directory, { recursive: true });
     await writeFile(join(directory, 'audio.wav'), 'fixture');
@@ -26,6 +27,29 @@ async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
 }
 const result = { text: 'Hej Sverige.', words: [{ start: 1.1, end: 1.5, text: 'Hej' }, { start: 1.5, end: 1.9, text: 'Sverige.' }] };
 const engine = (transcribe: Engine['transcribe'] = async () => result): Engine => ({ close: async () => {}, transcribe });
+
+test('without output, inference is cached and can be exported later without preparing audio', async t => {
+  const f = await fixture(t);
+  const completed: Completed[] = [];
+  const { output: _output, ...options } = f.options;
+  const first = await runSources([f.source], options, { ...f,
+    dependencies: { engine: engine(), prepare: f.prepare, slice: f.slice },
+    onResult: value => { completed.push(value); },
+  });
+  assert.equal(first.completed, 1); assert.equal(first.cached, 0);
+  assert.deepEqual(completed[0]!.files, []);
+  assert.ok(completed[0]!.transcript.text.includes('Hej Sverige.'));
+  assert.ok(await new TranscriptCache(f.home.transcripts).get(cacheKey(f.source, options.settings)));
+  await assert.rejects(() => readdir(f.options.output), { code: 'ENOENT' });
+  const exported = await runSources([f.source], f.options, { ...f,
+    dependencies: {
+      engine: engine(async () => { throw new Error('Must not infer'); }),
+      prepare: async () => { throw new Error('Must not prepare audio'); },
+    },
+  });
+  assert.equal(exported.cached, 1); assert.equal(exported.completed, 1);
+  assert.deepEqual((await readdir(f.options.output)).map(file => file.split('.').at(-1)).sort(), ['json', 'srt', 'txt', 'vtt']);
+});
 
 test('interruption saves only complete files; reruns start the interrupted file over', async t => {
   const f = await fixture(t); const abort = new AbortController(); let calls = 0;

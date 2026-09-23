@@ -4,7 +4,7 @@ Transcribe Swedish audio from your terminal with [Klang Pianissimo](https://hugg
 
 ```bash
 pianissimo interview.wav
-pianissimo ./recordings --recursive --format txt,srt
+pianissimo ./recordings --recursive --format txt,srt --output ./transcripts
 pianissimo 'https://www.youtube.com/@svt/videos' --limit 3 --output ./svt
 pianissimo 'https://api.sr.se/api/rss/pod/itunes/3795' --limit 1
 pianissimo 'https://www.svtplay.se/klipp/eDvaJEz/vem-ar-alexander-ernstberger'
@@ -58,9 +58,9 @@ For web playlists, `--limit` counts inspected entries, including unavailable or 
 
 ## Output
 
-Transcripts are saved in `./transcripts`. Change the destination with `--output`. Available formats are `txt` (default), `md`, `json`, `srt` and `vtt`. A JSON file with full text, word timestamps, source and model metadata is always saved alongside the requested formats.
+Transcripts go to stdout by default. No export directory is created. Use shell redirection to save stdout, or `--output <directory>` to export one set of files per source. Completed transcripts are still cached in the [application data directory](#storage).
 
-`--format` also selects stdout. With several formats, the first is printed and all are saved:
+Available formats are `txt` (default), `md`, `json`, `srt` and `vtt`. `--format` selects stdout. With several formats, the first is printed; `--output` saves all requested formats plus a JSON file with full text, word timestamps, source and model metadata.
 
 ```bash
 pianissimo interview.wav --format srt > interview.srt
@@ -70,10 +70,10 @@ pianissimo ./recordings --format json > transcripts.ndjson
 
 JSON stdout contains one complete transcript object per line. Use a single source when redirecting SRT or VTT into one subtitle file. Progress and errors go to stderr; `--quiet` hides progress.
 
-For scripts that need file paths, per-source errors and a final summary, use `--json`. This selects an NDJSON event stream instead of transcript-only stdout; `--format` still controls saved files.
+For scripts that need file paths, per-source errors and a final summary, use `--json`. This selects an NDJSON event stream instead of transcript-only stdout. Without `--output`, transcript events have an empty `files` array. With `--output`, `--format` controls the exported files.
 
 ```bash
-pianissimo ./recordings --recursive --format txt,srt --json > results.ndjson
+pianissimo ./recordings --recursive --format txt,srt --output ./transcripts --json > results.ndjson
 pianissimo doctor --json
 ```
 
@@ -94,7 +94,7 @@ pianissimo interview.wav --device cpu --force
 
 Completed transcripts are reused on later runs. Changing export formats or the output folder does not require new inference. Changed local files or inference settings get a new cache entry. Use `--force` when remote audio changes under the same source ID.
 
-Ctrl+C stops the run and removes temporary audio. Completed transcripts remain saved; an interrupted file starts again next time. Individual source failures do not stop the remaining sources; discovery and fatal worker errors do.
+Ctrl+C stops the run and removes temporary audio. Completed transcripts remain cached; an interrupted file starts again next time. Individual source failures do not stop the remaining sources; discovery and fatal worker errors do.
 
 Local files work offline after setup:
 
@@ -142,6 +142,16 @@ npm run test:media
 To install a checkout globally, run `npm run build && npm install -g .`.
 
 `test:media` needs yt-dlp and FFmpeg; `setup` installs yt-dlp. The other checks do not download the model. Run `pianissimo --help` for everyday options and `pianissimo --help-all` for advanced flags.
+
+To release a patch from a clean checkout with committed changes:
+
+```bash
+npm version patch
+npm publish
+git push origin main --follow-tags
+```
+
+`npm publish` runs the checks and package installation test before publishing. The package is public by default. npm may ask you to confirm with your passkey. Use `npm version minor` for a feature release. Each published version is immutable.
 
 ## License
 

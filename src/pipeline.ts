@@ -80,7 +80,8 @@ export async function runSources(sources: ((signal: AbortSignal) => AsyncIterabl
     const prepared = prefetch(typeof sources === 'function' ? sources(signal) : sources, options.downloads, async source => {
       signal.throwIfAborted();
       const key = cacheKey(source, options.settings);
-      const cached = !options.force ? await cache.get(key, join(options.output, `${exportStem(source, key)}.json`)) : undefined;
+      const existingExport = options.output === undefined ? undefined : join(options.output, `${exportStem(source, key)}.json`);
+      const cached = !options.force ? await cache.get(key, existingExport) : undefined;
       if (cached) return { key, cached, audio: undefined };
       reporter.status(`Preparing ${source.title}`);
       const work = await mkdtemp(join(directory!, 'input-'));
@@ -131,11 +132,11 @@ export async function runSources(sources: ((signal: AbortSignal) => AsyncIterabl
             // The identity is stable even when a feed rotates its signed enclosure URL.
             transcript = { ...transcript, source };
           }
-          const files = await exportTranscript(transcript, options.output, options.formats, key);
+          const files = options.output === undefined ? [] : await exportTranscript(transcript, options.output, options.formats, key);
           summary.completed++;
           if (cached) summary.cached++;
           complete = { type: 'transcript', cached: Boolean(cached), transcript, files };
-          reporter.note(`✓ ${source.title} · ${cached ? 'cached' : duration(transcript.duration)} · ${files.length} files`);
+          reporter.note(`✓ ${source.title} · ${cached ? 'cached' : duration(transcript.duration)}${files.length ? ` · ${files.length} files` : ''}`);
         } catch (error) {
           signal.throwIfAborted();
           if (error instanceof EngineError) throw error;
@@ -151,7 +152,7 @@ export async function runSources(sources: ((signal: AbortSignal) => AsyncIterabl
     } catch (error) { controller.abort(error); throw error; }
     finally { await prepared.return(); }
     summary.status = summary.failed ? summary.completed ? 'partial' : 'failed' : 'completed';
-    reporter.finish(`${summary.completed} saved · ${summary.cached} cached · ${summary.failed} failed\n${options.output}`);
+    reporter.finish(`${summary.completed} completed · ${summary.cached} cached · ${summary.failed} failed${options.output === undefined ? '' : `\n${options.output}`}`);
     return summary;
   } catch (error) { controller.abort(error); reporter.finish('Stopped. Completed transcripts are saved.'); throw error; }
   finally {

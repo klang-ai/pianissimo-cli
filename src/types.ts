@@ -34,7 +34,7 @@ export interface Transcript extends Recognition {
   runtime?: Runtime;
 }
 export interface RunOptions {
-  output: string;
+  output?: string;
   formats: Format[];
   settings: Settings;
   downloads: number;

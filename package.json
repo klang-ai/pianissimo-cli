@@ -1,6 +1,6 @@
 {
   "name": "@klangai/pianissimo-cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Swedish speech to text for files, podcasts and media URLs, powered by Klang Pianissimo.",
   "license": "MIT",
   "author": "Klang",
@@ -12,7 +12,14 @@
   "bugs": {
     "url": "https://github.com/klang-ai/pianissimo-cli/issues"
   },
-  "keywords": ["cli", "speech-to-text", "transcription", "swedish", "pianissimo", "subtitles"],
+  "keywords": [
+    "cli",
+    "speech-to-text",
+    "transcription",
+    "swedish",
+    "pianissimo",
+    "subtitles"
+  ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -41,6 +48,7 @@
     "test:worker": "python3 -m unittest discover -s test -p '*_test.py'",
     "check": "npm run typecheck && npm test && npm run test:worker && npm run build",
     "prepack": "npm run build",
+    "prepublishOnly": "npm run check && npm run test:package",
     "test:package": "node scripts/test-package.mjs",
     "test:media": "node --import tsx scripts/test-media-integration.ts"
   },

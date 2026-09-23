@@ -38,14 +38,14 @@ const formats = (value: string): Format[] => {
   return [...new Set(values)] as Format[];
 };
 interface Options {
-  output: string; format: Format[]; device: Device; force: boolean; recursive: boolean; limit?: number;
+  output?: string; format: Format[]; device: Device; force: boolean; recursive: boolean; limit?: number;
   dryRun: boolean; json: boolean; quiet: boolean; revision: string; chunkSeconds: number;
   downloads: number; keepAudio: boolean; source: 'auto' | 'feed' | 'web';
 }
 function sourceOptions(command: Command) {
   return command.argument('[source]', 'file, folder, podcast RSS feed or media URL')
-    .option('-o, --output <directory>', 'where to save transcripts', './transcripts')
-    .option('-f, --format <formats>', 'file formats: txt, md, json, srt, vtt; first format also goes to stdout', formats, ['txt'])
+    .option('-o, --output <directory>', 'also export transcript files to this directory')
+    .option('-f, --format <formats>', 'txt, md, json, srt, vtt; first to stdout, all exported with --output', formats, ['txt'])
     .addOption(new Option('--device <device>', 'inference device').choices(['auto', 'cpu', 'mps', 'cuda']).default('auto'))
     .option('--force', 'transcribe again, bypassing the transcript cache')
     .option('-r, --recursive', 'include subfolders')
@@ -60,7 +60,7 @@ function sourceOptions(command: Command) {
     .addOption(new Option('--keep-audio', 'retain temporary audio').hideHelp());
 }
 const program = sourceOptions(new Command().enablePositionalOptions().name('pianissimo').description('Swedish speech to text. Give it a file, folder, podcast feed or media URL.').version(VERSION));
-program.addHelpText('after', `\nExamples:\n  pianissimo interview.wav\n  pianissimo ./recordings --recursive --format txt,srt\n  pianissimo 'https://www.youtube.com/@svt/videos' --limit 5\n  pianissimo 'https://example.com/podcast.xml' --limit 3\n  pianissimo 'https://www.svtplay.se/video/…'\n\nRun pianissimo setup once. Use --help-all for advanced options.`);
+program.addHelpText('after', `\nExamples:\n  pianissimo interview.wav\n  pianissimo interview.wav --format srt > interview.srt\n  pianissimo ./recordings --recursive --format txt,srt --output ./transcripts\n  pianissimo 'https://www.youtube.com/@svt/videos' --limit 3\n  pianissimo 'https://api.sr.se/api/rss/pod/itunes/3795' --limit 1\n\nTranscripts go to stdout. Use --output to also save files.\nRun pianissimo setup once. Use --help-all for advanced options.`);
 program.option('--help-all', 'show advanced options');
 program.on('option:help-all', () => {
   for (const option of program.options) option.hidden = false;
@@ -91,7 +91,7 @@ async function transcribe(input: string | undefined, options: Options, command: 
     else reporter.note(`${count} sources. No audio downloaded.`);
     return;
   }
-  const result = await runSources(discover, { output: resolve(options.output), formats: options.format,
+  const result = await runSources(discover, { output: options.output === undefined ? undefined : resolve(options.output), formats: options.format,
     settings: { ...DEFAULT_SETTINGS, revision: options.revision, device: options.device, chunkSeconds: options.chunkSeconds },
     downloads: options.downloads, keepAudio: options.keepAudio, force: options.force }, {
     signal: abort.signal, reporter,

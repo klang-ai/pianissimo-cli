@@ -2,10 +2,10 @@ import { homedir } from 'node:os';
 import envPaths from 'env-paths';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { Settings } from './types.js';
 
-export const VERSION = '0.2.1';
+export const VERSION: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 export const MODEL = 'KlangAI/pianissimo-sv';
 export const REVISION = '8f1f6d8f8bd7482a5ea1d2bfaf6ef5be61597138';
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');

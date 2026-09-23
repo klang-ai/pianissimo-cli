@@ -71,7 +71,16 @@ test('CLI stdout follows export format, streams JSON collections and preserves e
   }));
   for (const transcript of transcripts) await cache.save(cacheKey(transcript.source, DEFAULT_SETTINGS), transcript);
   const first = transcripts[0]!;
+  const workingDirectory = join(root, 'cwd'); await mkdir(workingDirectory);
+  const plain = cli([first.source.location], home, workingDirectory);
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.equal(plain.stdout, render(first, 'txt'));
+  assert.doesNotMatch(plain.stderr, /0 files|undefined|transcripts/);
   for (const format of ['txt', 'md', 'json', 'srt', 'vtt'] as Format[]) {
+    const stdoutOnly = cli([first.source.location, '--format', format], home, workingDirectory);
+    assert.equal(stdoutOnly.status, 0, stdoutOnly.stderr);
+    if (format === 'json') assert.deepEqual(JSON.parse(stdoutOnly.stdout), first);
+    else assert.equal(stdoutOnly.stdout, render(first, format));
     const output = join(root, format);
     const result = cli([first.source.location, '--format', format, '--output', output, '--quiet'], home);
     assert.equal(result.status, 0, result.stderr); assert.equal(result.stderr, '');
@@ -96,9 +105,15 @@ test('CLI stdout follows export format, streams JSON collections and preserves e
   assert.equal(multiple.status, 0, multiple.stderr);
   assert.equal(multiple.stdout, render(first, 'srt'));
   assert.deepEqual((await readdir(join(root, 'multiple'))).map(name => name.split('.').at(-1)).sort(), ['json', 'srt', 'txt']);
-  const collection = cli([inputs, '--format', 'json', '--output', join(root, 'collection')], home);
+  const collection = cli([inputs, '--format', 'json'], home, workingDirectory);
   assert.equal(collection.status, 0, collection.stderr);
   assert.deepEqual(collection.stdout.trim().split('\n').map(line => JSON.parse(line)), transcripts);
+  const stdoutEvents = cli([inputs, '--json'], home, workingDirectory);
+  assert.equal(stdoutEvents.status, 0, stdoutEvents.stderr);
+  const stdoutRecords = stdoutEvents.stdout.trim().split('\n').map(line => JSON.parse(line));
+  assert.equal(stdoutRecords.at(-1).completed, 2);
+  for (const record of stdoutRecords.slice(0, -1)) assert.deepEqual(record.files, []);
+  assert.deepEqual(await readdir(workingDirectory), []);
   const events = cli([first.source.location, '--format', 'srt', '--json', '--output', join(root, 'events')], home);
   assert.equal(events.status, 0, events.stderr);
   const records = events.stdout.trim().split('\n').map(line => JSON.parse(line));
