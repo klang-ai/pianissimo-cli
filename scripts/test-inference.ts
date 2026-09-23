@@ -22,6 +22,7 @@ try {
   assert.ok(result, 'Expected a real transcript');
   assert.equal(result.cached, false);
   const transcript = result.transcript as Transcript;
+  console.log(JSON.stringify({ runtime: transcript.runtime, text: transcript.text, words: transcript.words.length }));
   parseRecognition(transcript);
   assert.ok(transcript.words.length >= 5, `Expected Swedish speech, got: ${transcript.text}`);
   assert.match(transcript.text.toLowerCase(), /hej|svensk|solen|promenad/);
