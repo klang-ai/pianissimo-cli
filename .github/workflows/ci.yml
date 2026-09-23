@@ -72,19 +72,7 @@ jobs:
       - name: Set up the real inference environment and model
         run: node bin/pianissimo.js setup
       - name: Transcribe Swedish speech offline and reuse its cache
-        id: speech
         run: npm run test:inference
-      - name: Diagnose Mac backend compatibility
-        if: failure() && runner.os == 'macOS' && steps.speech.outcome == 'failure'
-        shell: bash
-        run: |
-          node bin/pianissimo.js test/fixtures/swedish.wav --device cpu --force --format json --output /tmp/pianissimo-cpu
-          for version in 2.11.0 2.8.0; do
-            uv pip install --python .pianissimo/venv/bin/python "torch==$version" "torchaudio==$version"
-            if npm run test:inference; then
-              break
-            fi
-          done
       - name: Verify setup reuses the model with Hugging Face offline
         run: node bin/pianissimo.js setup
         env:
