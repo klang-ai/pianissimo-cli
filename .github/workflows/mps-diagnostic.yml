@@ -1,0 +1,33 @@
+name: MPS diagnostic
+on:
+  push:
+    branches: [andreas/kla-1531-mps-stability]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        load-on: [cpu, mps]
+    env:
+      PIANISSIMO_HOME: ${{ github.workspace }}/.pianissimo
+      UV_NO_CACHE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+      - run: brew install ffmpeg
+      - run: npm ci
+      - run: npm run build
+      - run: node bin/pianissimo.js setup
+      - run: .pianissimo/venv/bin/python scripts/diagnose-mps.py --load-on '${{ matrix.load-on }}'
