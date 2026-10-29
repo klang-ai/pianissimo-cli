@@ -42,12 +42,13 @@ def main():
     parser.add_argument("--download", action="store_true")
     parser.add_argument("--model", default="KlangAI/pianissimo-sv")
     parser.add_argument("--revision", default="8f1f6d8f8bd7482a5ea1d2bfaf6ef5be61597138")
+    parser.add_argument("--filename", default="pianissimo-sv.nemo")
     parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
     parser.add_argument("--cache-dir", required=True)
     args = parser.parse_args()
     def checkpoint_from_disk_or_download():
         return resolve_checkpoint(args.model, args.revision, args.cache_dir,
-                                  lambda text: emit({"type": "status", "message": text}))
+                                  lambda text: emit({"type": "status", "message": text}), args.filename)
 
     # Fetching weights does not require importing or initializing the inference stack.
     if args.download:

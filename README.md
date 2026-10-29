@@ -1,6 +1,6 @@
 # Pianissimo CLI
 
-Transcribe Swedish audio from your terminal with [Klang Pianissimo](https://huggingface.co/KlangAI/pianissimo-sv). Takes local files, folders, podcast feeds, YouTube channels and media URLs. Inference runs on your computer; audio is not uploaded to a transcription service.
+Transcribe Swedish or Danish audio from your terminal with [Klang Pianissimo](https://huggingface.co/KlangAI/pianissimo-sv). Takes local files, folders, podcast feeds, YouTube channels and media URLs. Inference runs on your computer; audio is not uploaded to a transcription service.
 
 ```bash
 pianissimo interview.wav
@@ -8,6 +8,7 @@ pianissimo ./recordings --recursive --format txt,srt --output ./transcripts
 pianissimo 'https://www.youtube.com/@svt/videos' --limit 3 --output ./svt
 pianissimo 'https://api.sr.se/api/rss/pod/itunes/3795' --limit 1
 pianissimo 'https://www.svtplay.se/klipp/eDvaJEz/vem-ar-alexander-ernstberger'
+pianissimo interview.wav --language da
 ```
 
 ## Install
@@ -45,6 +46,18 @@ pianissimo interview.wav
 Linux computers without a working NVIDIA GPU get CPU-only PyTorch, avoiding the large CUDA runtime download. Intel and AMD graphics use CPU inference. macOS uses PyTorch 2.11 with Apple Metal support. The worker waits for input transfers to finish on MPS to prevent corrupted audio and timestamps. NVIDIA detection uses `nvidia-smi`; for a custom CUDA build, see [Storage](#storage).
 
 CI runs setup and real Swedish speech inference on Linux and macOS, including both automatic device selection and explicit CPU inference on Mac. CUDA, native Windows and WSL2 inference are not covered by these checks.
+
+## Danish
+
+Add `--language da` to use [Klang Pianissimo for Danish](https://huggingface.co/KlangAI/pianissimo-da). On Klang's own Danish test sets, it is the most accurate open Danish speech recognition model. It is available on Hugging Face from its launch day, 2 November 2026.
+
+```bash
+pianissimo setup --language da
+pianissimo doctor --language da
+pianissimo interview.wav --language da --format srt > interview.srt
+```
+
+Swedish remains the default. `setup` downloads the model for the chosen language, about 2.51 GB each; a missing model is otherwise downloaded on first use. Danish recordings are transcribed in 30-second parts, as the model card recommends for long recordings. Transcripts from the two models are cached separately.
 
 ## Sources
 
@@ -177,4 +190,4 @@ git push origin main --follow-tags
 
 The CLI source code is licensed under the [MIT License](LICENSE).
 
-The [Pianissimo model](https://huggingface.co/KlangAI/pianissimo-sv) is developed by Klang and licensed separately under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Model weights are downloaded unchanged and are not bundled with the CLI. See [NOTICE](NOTICE) for model attribution. Dependencies retain their own licenses.
+The Pianissimo models for [Swedish](https://huggingface.co/KlangAI/pianissimo-sv) and [Danish](https://huggingface.co/KlangAI/pianissimo-da) are developed by Klang and licensed separately under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Model weights are downloaded unchanged and are not bundled with the CLI. See [NOTICE](NOTICE) for model attribution. Dependencies retain their own licenses.

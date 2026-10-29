@@ -4,7 +4,7 @@ import { createWriteStream, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { lifecycle, subprocessOptions } from './subprocess.js';
-import { paths, pythonPath, ROOT } from './config.js';
+import { modelFilename, paths, pythonPath, ROOT } from './config.js';
 import type { Engine, Recognition, Runtime, Settings, Word } from './types.js';
 
 // A dead/misconfigured worker cannot process any later source in this run.
@@ -45,7 +45,7 @@ export class NemoEngine implements Engine {
     const log = createWriteStream(logPath, { flags: 'a', mode: 0o600 });
     log.on('error', () => {});
     const child = spawn(pythonPath(this.home), ['-u', join(ROOT, 'worker/pianissimo_worker.py'),
-      '--model', this.settings.model, '--revision', this.settings.revision,
+      '--model', this.settings.model, '--revision', this.settings.revision, '--filename', modelFilename(this.settings.model),
       '--device', this.settings.device, '--cache-dir', this.home.models], {
       stdio: ['pipe', 'pipe', 'pipe'], ...subprocessOptions,
       env: { ...process.env, PYTHONUNBUFFERED: '1', HF_HUB_DISABLE_TELEMETRY: '1', TOKENIZERS_PARALLELISM: 'false' },
