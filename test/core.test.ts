@@ -50,7 +50,7 @@ test('Swedish settings and cache keys are unchanged; Danish uses its own model a
   assert.equal(JSON.stringify(settingsFor('sv')), JSON.stringify(DEFAULT_SETTINGS));
   const danish = settingsFor('da');
   assert.equal(danish.model, 'KlangAI/pianissimo-da');
-  assert.equal(danish.chunkSeconds, 30);
+  assert.equal(danish.chunkSeconds, 120);
   assert.equal(modelFilename(danish.model), 'pianissimo-da.nemo');
   assert.equal(modelFilename(DEFAULT_SETTINGS.model), 'pianissimo-sv.nemo');
   assert.notEqual(cacheKey(transcript.source, danish), cacheKey(transcript.source, DEFAULT_SETTINGS));

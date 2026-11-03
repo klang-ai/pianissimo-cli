@@ -57,7 +57,7 @@ pianissimo doctor --language da
 pianissimo interview.wav --language da --format srt > interview.srt
 ```
 
-Swedish remains the default. `setup` downloads the model for the chosen language, about 2.51 GB each; a missing model is otherwise downloaded on first use. Danish recordings are transcribed in 30-second parts, as the model card recommends for long recordings. Transcripts from the two models are cached separately.
+Swedish remains the default. `setup` downloads the model for the chosen language, about 2.51 GB each; a missing model is otherwise downloaded on first use. Transcripts from the two models are cached separately.
 
 ## Sources
 

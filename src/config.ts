@@ -8,8 +8,7 @@ import type { Settings } from './types.js';
 export const VERSION: string = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 export const MODELS = {
   sv: { id: 'KlangAI/pianissimo-sv', revision: '8f1f6d8f8bd7482a5ea1d2bfaf6ef5be61597138', filename: 'pianissimo-sv.nemo', chunkSeconds: 120 },
-  // The Danish model card recommends pieces of about 30 seconds for long recordings.
-  da: { id: 'KlangAI/pianissimo-da', revision: '1af16817a76d1324e6ee11daad42cb0d6cf7e5b5', filename: 'pianissimo-da.nemo', chunkSeconds: 30 },
+  da: { id: 'KlangAI/pianissimo-da', revision: '1af16817a76d1324e6ee11daad42cb0d6cf7e5b5', filename: 'pianissimo-da.nemo', chunkSeconds: 120 },
 } as const;
 export type Language = keyof typeof MODELS;
 export const LANGUAGES = Object.keys(MODELS) as Language[];

@@ -59,7 +59,7 @@ function sourceOptions(command: Command) {
     .option('-q, --quiet', 'only show errors on stderr')
     .addOption(new Option('--source <type>', 'override URL detection').choices(['auto', 'feed', 'web']).default('auto').hideHelp())
     .addOption(new Option('--revision <sha>', 'immutable model revision (default: the pinned revision for the language)').argParser(revision).hideHelp())
-    .addOption(new Option('--chunk-seconds <seconds>', `audio length per inference call (default: ${MODELS.sv.chunkSeconds} for Swedish, ${MODELS.da.chunkSeconds} for Danish)`).argParser(integer(15, 600)).hideHelp())
+    .addOption(new Option('--chunk-seconds <seconds>', `audio length per inference call (default: ${MODELS.sv.chunkSeconds})`).argParser(integer(15, 600)).hideHelp())
     .addOption(new Option('--downloads <count>', 'number of inputs prepared ahead').argParser(integer(1, 4)).default(2).hideHelp())
     .addOption(new Option('--keep-audio', 'retain temporary audio').hideHelp());
 }
