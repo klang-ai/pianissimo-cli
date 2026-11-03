@@ -13,13 +13,13 @@ class LocalEntryNotFoundError(Exception):
 
 
 class ModelCacheTests(unittest.TestCase):
-    def resolve_with(self, download, report):
+    def resolve_with(self, download, report, **options):
         hub = ModuleType("huggingface_hub")
         hub.hf_hub_download = download
         errors = ModuleType("huggingface_hub.errors")
         errors.LocalEntryNotFoundError = LocalEntryNotFoundError
         with patch.dict(sys.modules, {"huggingface_hub": hub, "huggingface_hub.errors": errors}):
-            return resolve_checkpoint("KlangAI/pianissimo-sv", "a" * 40, "/cache", report)
+            return resolve_checkpoint("KlangAI/pianissimo-sv", "a" * 40, "/cache", report, **options)
 
     def test_repeated_cache_hits_are_local_only_and_never_report_a_download(self):
         download, report = Mock(return_value="/cache/pianissimo.nemo"), Mock()
@@ -40,6 +40,13 @@ class ModelCacheTests(unittest.TestCase):
         self.assertTrue(download.call_args_list[0].kwargs["local_files_only"])
         self.assertNotIn("local_files_only", download.call_args_list[1].kwargs)
         self.assertIn("Downloading", report.call_args.args[0])
+
+    def test_swedish_is_the_default_checkpoint_and_danish_is_selectable(self):
+        download = Mock(return_value="/cache/pianissimo.nemo")
+        self.resolve_with(download, Mock())
+        self.assertEqual(download.call_args.kwargs["filename"], "pianissimo-sv.nemo")
+        self.resolve_with(download, Mock(), filename="pianissimo-da.nemo")
+        self.assertEqual(download.call_args.kwargs["filename"], "pianissimo-da.nemo")
 
     def test_disk_errors_do_not_trigger_another_download(self):
         download, report = Mock(side_effect=PermissionError("Cannot read cache")), Mock()

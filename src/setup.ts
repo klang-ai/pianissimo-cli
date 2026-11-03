@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { mkdir, stat, statfs } from 'node:fs/promises';
 import { join } from 'node:path';
-import { MODEL, REVISION, ROOT, paths, pythonPath } from './config.js';
+import { MODELS, ROOT, paths, pythonPath, type Language } from './config.js';
 import { run } from './process.js';
 import { importModels } from './state.js';
 import { message } from './util.js';
@@ -37,11 +37,12 @@ export async function useCpuTorch(signal: AbortSignal, platform: NodeJS.Platform
   }
 }
 
-function checkpointPath(home = paths()) {
-  return join(home.models, `models--${MODEL.replace('/', '--')}`, 'snapshots', REVISION, 'pianissimo-sv.nemo');
+function checkpointPath(home = paths(), language: Language = 'sv') {
+  const model = MODELS[language];
+  return join(home.models, `models--${model.id.replace('/', '--')}`, 'snapshots', model.revision, model.filename);
 }
-async function hasCheckpoint(home = paths()) {
-  return stat(checkpointPath(home)).then(info => info.isFile() && info.size > 0, () => false);
+async function hasCheckpoint(home = paths(), language: Language = 'sv') {
+  return stat(checkpointPath(home, language)).then(info => info.isFile() && info.size > 0, () => false);
 }
 
 export function requireModelSpace(available: number) {
@@ -49,13 +50,13 @@ export function requireModelSpace(available: number) {
     throw new Error(`Not enough disk space: ${(available / 1024 ** 3).toFixed(1)} GiB available. The model needs at least 3 GiB free, plus additional space for Python dependencies and temporary audio. Free disk space or set PIANISSIMO_HOME to a larger drive.`);
   }
 }
-async function checkModelSpace(home = paths()) {
-  if (await hasCheckpoint(home)) return;
+async function checkModelSpace(home = paths(), language: Language = 'sv') {
+  if (await hasCheckpoint(home, language)) return;
   const disk = await statfs(home.root);
   requireModelSpace(disk.bavail * disk.bsize);
 }
 
-export async function doctor(signal: AbortSignal): Promise<Check[]> {
+export async function doctor(signal: AbortSignal, language: Language = 'sv'): Promise<Check[]> {
   const home = paths();
   const checks = await Promise.all([
     ['FFmpeg', 'ffmpeg', ['-version'], 'Install FFmpeg: https://ffmpeg.org/download.html'],
@@ -75,12 +76,14 @@ export async function doctor(signal: AbortSignal): Promise<Check[]> {
   } catch (error) {
     checks.push({ name: 'Inference', ok: false, detail: message(error), fix: 'Run pianissimo setup, or set PIANISSIMO_PYTHON to your NeMo environment.' });
   }
-  const cached = await hasCheckpoint(home);
-  checks.push({ name: 'Model cache', ok: cached, detail: checkpointPath(home), ...(!cached ? { fix: 'Run pianissimo setup.' } : {}) });
+  const cached = await hasCheckpoint(home, language);
+  const fix = language === 'sv' ? 'Run pianissimo setup.' : `Run pianissimo setup --language ${language}.`;
+  checks.push({ name: 'Model cache', ok: cached, detail: checkpointPath(home, language), ...(!cached ? { fix } : {}) });
   signal.throwIfAborted();
   return checks;
 }
-export async function setup(options: { python?: string; from?: string; signal: AbortSignal; reporter: Reporter }) {
+export async function setup(options: { python?: string; from?: string; language?: Language; signal: AbortSignal; reporter: Reporter }) {
+  const language = options.language ?? 'sv';
   const home = paths();
   await mkdir(home.root, { recursive: true, mode: 0o700 });
   const controller = new AbortController();
@@ -99,7 +102,7 @@ export async function setup(options: { python?: string; from?: string; signal: A
     if (options.from && !existsSync(join(options.from, 'models'))) throw new Error('--from must point to a Pianissimo home containing a models directory.');
     const imported = await importModels(home, options.from ? [options.from] : undefined);
     if (imported) options.reporter.note(`Reused ${imported} model snapshot(s) from an earlier installation.`);
-    await checkModelSpace(home);
+    await checkModelSpace(home, language);
     let uv = false;
     try { await run('uv', ['--version'], { signal }); uv = true; } catch { /* pip fallback */ }
     const python = join(home.venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
@@ -126,20 +129,21 @@ export async function setup(options: { python?: string; from?: string; signal: A
     options.reporter.status('Checking the inference environment.');
     const check = await run(python, [join(ROOT, 'worker/pianissimo_worker.py'), '--check', '--cache-dir', home.models], { signal, timeoutMs: 120000 });
     options.reporter.status('Checking the model cache.');
-    await downloadModel(signal, text => options.reporter.status(text));
+    await downloadModel(signal, text => options.reporter.status(text), language);
     await checkYtdlp(signal);
-    options.reporter.finish('Ready. Run pianissimo <file-or-url> to transcribe.');
+    options.reporter.finish(`Ready. Run pianissimo <file-or-url>${language === 'sv' ? '' : ` --language ${language}`} to transcribe.`);
     return JSON.parse(check) as Record<string, unknown>;
   } catch (error) { options.reporter.finish('Setup stopped. Run it again after resolving the error.'); throw error; }
   finally { await unlock(); }
 }
-export async function downloadModel(signal: AbortSignal, onStatus: (text: string) => void = () => {}) {
+export async function downloadModel(signal: AbortSignal, onStatus: (text: string) => void = () => {}, language: Language = 'sv') {
   const home = paths();
+  const model = MODELS[language];
   // Dependencies may have consumed the space checked before installation.
-  await checkModelSpace(home);
+  await checkModelSpace(home, language);
   let result: Record<string, unknown> | undefined;
   await run(pythonPath(home), [join(ROOT, 'worker/pianissimo_worker.py'), '--download',
-    '--model', MODEL, '--revision', REVISION, '--cache-dir', home.models], { signal, onLine: line => {
+    '--model', model.id, '--revision', model.revision, '--filename', model.filename, '--cache-dir', home.models], { signal, onLine: line => {
       const data = JSON.parse(line) as Record<string, unknown>;
       if (data.type === 'status' && typeof data.message === 'string') onStatus(data.message);
       else if (data.ok === true && typeof data.checkpoint === 'string') result = data;

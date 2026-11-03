@@ -4,14 +4,15 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { NemoEngine } from '../src/engine.js';
-import { DEFAULT_SETTINGS, paths } from '../src/config.js';
+import { DEFAULT_SETTINGS, paths, settingsFor } from '../src/config.js';
+import type { Settings } from '../src/types.js';
 
-async function worker(t: { after: (fn: () => Promise<void>) => void }, source: string, device = DEFAULT_SETTINGS.device) {
+async function worker(t: { after: (fn: () => Promise<void>) => void }, source: string, device = DEFAULT_SETTINGS.device, settings: Settings = DEFAULT_SETTINGS) {
   const root = await mkdtemp(join(tmpdir(), 'pianissimo-engine-'));
   const home = paths(root);
   const bin = join(home.venv, 'bin'); await mkdir(bin, { recursive: true });
   await writeFile(join(bin, 'python'), `#!${process.execPath}\n${source}\n`, { mode: 0o700 });
-  const engine = new NemoEngine({ ...DEFAULT_SETTINGS, device }, home);
+  const engine = new NemoEngine({ ...settings, device }, home);
   t.after(async () => { await engine.close(); await rm(root, { recursive: true, force: true }); });
   return engine;
 }
@@ -61,4 +62,18 @@ test('explicit MPS is sent to the worker and resolved hardware is recorded for a
     await engine.transcribe('/tmp/input.wav', new AbortController().signal);
     assert.deepEqual(engine.runtime, { device: 'mps', deviceName: 'Apple GPU', torch: 'test', nemo: 'test' });
   }
+});
+
+test('the Danish model and checkpoint file are sent to the worker', { skip: process.platform === 'win32' }, async t => {
+  const engine = await worker(t, `
+    const args = process.argv.slice(2);
+    const value = name => args[args.indexOf(name) + 1];
+    if (value('--model') !== 'KlangAI/pianissimo-da' || value('--filename') !== 'pianissimo-da.nemo') process.exit(2);
+    console.log(JSON.stringify({type:'ready',device:'cpu'}));
+    require('node:readline').createInterface({input:process.stdin}).on('line', line => {
+      const req = JSON.parse(line);
+      console.log(JSON.stringify({type:'result',id:req.id,text:'Hej',words:[{text:'Hej',start:0,end:1}]}));
+    });
+  `, 'cpu', settingsFor('da'));
+  assert.equal((await engine.transcribe('/tmp/input.wav', new AbortController().signal)).text, 'Hej');
 });

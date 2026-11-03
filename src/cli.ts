@@ -1,7 +1,7 @@
 import { Command, Option, InvalidArgumentError } from 'commander';
 import { resolve } from 'node:path';
 import { once } from 'node:events';
-import { DEFAULT_SETTINGS, VERSION, paths } from './config.js';
+import { LANGUAGES, MODELS, VERSION, paths, settingsFor, type Language } from './config.js';
 import { discoverSources } from './sources.js';
 import { runSources } from './pipeline.js';
 import { render } from './export.js';
@@ -39,13 +39,17 @@ const formats = (value: string): Format[] => {
 };
 interface Options {
   output?: string; format: Format[]; device: Device; force: boolean; recursive: boolean; limit?: number;
-  dryRun: boolean; json: boolean; quiet: boolean; revision: string; chunkSeconds: number;
+  dryRun: boolean; json: boolean; quiet: boolean; language: Language; revision?: string; chunkSeconds?: number;
   downloads: number; keepAudio: boolean; source: 'auto' | 'feed' | 'web';
+}
+function languageOption() {
+  return new Option('-l, --language <language>', 'speech language: sv (Swedish) or da (Danish)').choices(LANGUAGES).default('sv');
 }
 function sourceOptions(command: Command) {
   return command.argument('[source]', 'file, folder, podcast RSS feed or media URL')
     .option('-o, --output <directory>', 'also export transcript files to this directory')
     .option('-f, --format <formats>', 'txt, md, json, srt, vtt; first to stdout, all exported with --output', formats, ['txt'])
+    .addOption(languageOption())
     .addOption(new Option('--device <device>', 'inference device').choices(['auto', 'cpu', 'mps', 'cuda']).default('auto'))
     .option('--force', 'transcribe again, bypassing the transcript cache')
     .option('-r, --recursive', 'include subfolders')
@@ -54,13 +58,13 @@ function sourceOptions(command: Command) {
     .option('--json', 'stream JSON events and summary instead of formatted transcripts')
     .option('-q, --quiet', 'only show errors on stderr')
     .addOption(new Option('--source <type>', 'override URL detection').choices(['auto', 'feed', 'web']).default('auto').hideHelp())
-    .addOption(new Option('--revision <sha>', 'immutable model revision').argParser(revision).default(DEFAULT_SETTINGS.revision).hideHelp())
-    .addOption(new Option('--chunk-seconds <seconds>', 'audio length per inference call').argParser(integer(15, 600)).default(DEFAULT_SETTINGS.chunkSeconds).hideHelp())
+    .addOption(new Option('--revision <sha>', 'immutable model revision (default: the pinned revision for the language)').argParser(revision).hideHelp())
+    .addOption(new Option('--chunk-seconds <seconds>', `audio length per inference call (default: ${MODELS.sv.chunkSeconds})`).argParser(integer(15, 600)).hideHelp())
     .addOption(new Option('--downloads <count>', 'number of inputs prepared ahead').argParser(integer(1, 4)).default(2).hideHelp())
     .addOption(new Option('--keep-audio', 'retain temporary audio').hideHelp());
 }
-const program = sourceOptions(new Command().enablePositionalOptions().name('pianissimo').description('Swedish speech to text. Give it a file, folder, podcast feed or media URL.').version(VERSION));
-program.addHelpText('after', `\nExamples:\n  pianissimo interview.wav\n  pianissimo interview.wav --format srt > interview.srt\n  pianissimo ./recordings --recursive --format txt,srt --output ./transcripts\n  pianissimo 'https://www.youtube.com/@svt/videos' --limit 3\n  pianissimo 'https://api.sr.se/api/rss/pod/itunes/3795' --limit 1\n\nTranscripts go to stdout. Use --output to also save files.\nRun pianissimo setup once. Use --help-all for advanced options.`);
+const program = sourceOptions(new Command().enablePositionalOptions().name('pianissimo').description('Swedish and Danish speech to text. Give it a file, folder, podcast feed or media URL.').version(VERSION));
+program.addHelpText('after', `\nExamples:\n  pianissimo interview.wav\n  pianissimo interview.wav --format srt > interview.srt\n  pianissimo interview.wav --language da\n  pianissimo ./recordings --recursive --format txt,srt --output ./transcripts\n  pianissimo 'https://www.youtube.com/@svt/videos' --limit 3\n  pianissimo 'https://api.sr.se/api/rss/pod/itunes/3795' --limit 1\n\nTranscripts go to stdout. Use --output to also save files.\nRun pianissimo setup once. Use --help-all for advanced options.`);
 program.option('--help-all', 'show advanced options');
 program.on('option:help-all', () => {
   for (const option of program.options) option.hidden = false;
@@ -91,8 +95,9 @@ async function transcribe(input: string | undefined, options: Options, command: 
     else reporter.note(`${count} sources. No audio downloaded.`);
     return;
   }
+  const defaults = settingsFor(options.language);
   const result = await runSources(discover, { output: options.output === undefined ? undefined : resolve(options.output), formats: options.format,
-    settings: { ...DEFAULT_SETTINGS, revision: options.revision, device: options.device, chunkSeconds: options.chunkSeconds },
+    settings: { ...defaults, revision: options.revision ?? defaults.revision, device: options.device, chunkSeconds: options.chunkSeconds ?? defaults.chunkSeconds },
     downloads: options.downloads, keepAudio: options.keepAudio, force: options.force }, {
     signal: abort.signal, reporter,
     onResult: options.json ? output : async result => {
@@ -111,18 +116,24 @@ program.action(transcribe);
 for (const name of ['transcribe', 'youtube']) {
   sourceOptions(program.command(name, { hidden: true })).action(transcribe);
 }
+// `pianissimo --language da setup` sets the root option; the subcommand's own flag wins.
+function subcommandLanguage(command: Command): Language {
+  return (command.getOptionValueSource('language') === 'cli' ? command : program).opts().language as Language;
+}
 program.command('setup').description('Install the inference environment and cache the model')
   .option('--python <command>', 'Python 3.10–3.13 interpreter (auto-detected by default)')
   .option('--from <directory>', 'import a model cache from an older installation')
+  .addOption(languageOption())
   .option('--json', 'print setup details as JSON')
-  .action(async opts => {
-    const result = await setup({ python: opts.python as string | undefined, from: opts.from as string | undefined, signal: abort.signal, reporter: new Reporter() });
+  .action(async (opts, command: Command) => {
+    const result = await setup({ python: opts.python as string | undefined, from: opts.from as string | undefined, language: subcommandLanguage(command), signal: abort.signal, reporter: new Reporter() });
     if (opts.json || program.opts().json) await output({ type: 'setup', home: paths().root, ...result });
   });
 program.command('doctor').description('Check media tools, model cache and inference device')
+  .addOption(languageOption())
   .option('--json', 'print checks as JSON')
-  .action(async opts => {
-    const checks = await doctor(abort.signal);
+  .action(async (opts, command: Command) => {
+    const checks = await doctor(abort.signal, subcommandLanguage(command));
     if (opts.json || program.opts().json) await output({ type: 'doctor', home: paths().root, checks });
     else {
       const reporter = new Reporter();

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { DEFAULT_SETTINGS } from '../src/config.js';
+import { DEFAULT_SETTINGS, modelFilename, settingsFor } from '../src/config.js';
 import { cues, render, timestamp, exportTranscript } from '../src/export.js';
 import { cacheKey, cleanTerminal, safeName } from '../src/util.js';
 import { localSources } from '../src/sources.js';
@@ -44,6 +44,16 @@ test('cache separates revisions, input content, and inference settings', () => {
   assert.notEqual(key, cacheKey(transcript.source, { ...DEFAULT_SETTINGS, revision: 'b'.repeat(40) }));
   assert.notEqual(key, cacheKey(transcript.source, { ...DEFAULT_SETTINGS, chunkSeconds: 60 }));
   assert.notEqual(key, cacheKey({ ...transcript.source, fingerprint: 'changed' }, DEFAULT_SETTINGS));
+});
+
+test('Swedish settings and cache keys are unchanged; Danish uses its own model and pieces', () => {
+  assert.equal(JSON.stringify(settingsFor('sv')), JSON.stringify(DEFAULT_SETTINGS));
+  const danish = settingsFor('da');
+  assert.equal(danish.model, 'KlangAI/pianissimo-da');
+  assert.equal(danish.chunkSeconds, 120);
+  assert.equal(modelFilename(danish.model), 'pianissimo-da.nemo');
+  assert.equal(modelFilename(DEFAULT_SETTINGS.model), 'pianissimo-sv.nemo');
+  assert.notEqual(cacheKey(transcript.source, danish), cacheKey(transcript.source, DEFAULT_SETTINGS));
 });
 
 test('overlap ownership keeps each boundary word once with global timestamps', () => {

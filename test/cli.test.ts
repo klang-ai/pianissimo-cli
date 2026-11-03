@@ -34,6 +34,10 @@ test('CLI help, validation, and JSON dry-run work without model dependencies or 
   const json = records.at(-1); assert.equal(json.type, 'plan'); assert.equal(json.count, 1);
   const apple = cli([file, '--dry-run', '--device', 'mps', '--json'], home);
   assert.equal(apple.status, 0); assert.equal(JSON.parse(apple.stdout.trim().split('\n').at(-1)!).count, 1);
+  const danish = cli([file, '--dry-run', '--language', 'da', '--json'], home);
+  assert.equal(danish.status, 0, danish.stderr);
+  const norwegian = cli([file, '--dry-run', '--language', 'no'], home);
+  assert.notEqual(norwegian.status, 0); assert.match(norwegian.stderr, /Allowed choices/);
   const unknown = cli([file, '--dry-run', '--device', 'metal'], home);
   assert.notEqual(unknown.status, 0); assert.match(unknown.stderr, /Allowed choices/);
   for (const alias of ['transcribe', 'youtube']) {
